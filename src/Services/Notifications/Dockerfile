@@ -1,7 +1,7 @@
 # Stage 1: Build
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
-COPY ["src/Services/Notifications/Notifications.csproj", "."]
+COPY ["Notifications.csproj", "Notifications.csproj"]
 RUN dotnet restore "Notifications.csproj"
 COPY . .
 WORKDIR "/src"

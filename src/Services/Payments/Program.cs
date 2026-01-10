@@ -14,6 +14,8 @@ builder.Services.AddSingleton<IPaymentEventProducer, KafkaProducer>();
 
 var app = builder.Build();
 
+app.MapGet("/", () => "This is Payments Service");
+
 
 app.MapPost("/pay/initiate", async (InitiatePaymentRequest req, PaymentDbContext db) =>
 {
@@ -27,7 +29,7 @@ app.MapPost("/pay/initiate", async (InitiatePaymentRequest req, PaymentDbContext
     };
     
     db.Transactions.Add(transaction);     
-    await db.SaveChangesAsync();         
+    await db.SaveChangesAsync();        
 
     var producer = app.Services.GetRequiredService<IPaymentEventProducer>();
     await producer.ProducePaymentRequestedAsync(transaction.Id, req);
