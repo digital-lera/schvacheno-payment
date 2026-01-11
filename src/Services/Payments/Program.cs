@@ -37,6 +37,31 @@ app.MapPost("/pay/initiate", async (InitiatePaymentRequest req, PaymentDbContext
     return Results.Accepted("202"); // 202
 });
 
+app.MapPost("/test-db", async (PaymentDbContext db) =>
+{
+    // Тест INSERT
+    var testTx = new Transaction 
+    { 
+        UserId = Guid.NewGuid(), 
+        Amount = 999.99m,
+        Currency = "RUB"
+    };
+    
+    db.Transactions.Add(testTx);
+    await db.SaveChangesAsync();
+    
+    // Тест SELECT
+    var count = await db.Transactions.CountAsync();
+    
+    return Results.Ok(new 
+    { 
+        message = "✅ DB Works!",
+        createdId = testTx.Id,
+        totalTransactions = count
+    });
+});
+
+
 app.MapGet("/pay/status/{id:guid}", async (Guid id, PaymentDbContext db) =>
     await db.Transactions
         .Where(t => t.Id == id)
