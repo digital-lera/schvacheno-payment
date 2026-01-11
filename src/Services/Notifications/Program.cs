@@ -16,6 +16,7 @@ _ = Task.Run(() =>
 
     using var consumer = new ConsumerBuilder<Ignore, string>(consumerConfig).Build();
     consumer.Subscribe("payments-requested");
+    consumer.Subscribe("payments-requested-dlq");
     
     var consumeResult = consumer.Consume(TimeSpan.FromSeconds(1));
 

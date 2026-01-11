@@ -10,4 +10,5 @@ public class Transaction                    // PostgreSQL таблица
     public PaymentStatusEnum Status { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public string CardLast4 { get; set; } = "";        // Последние 4 цифры карты (маскировка)
+    public string EncryptedCardData { get; set; } = "";// Зашифрованные данные карты
 }

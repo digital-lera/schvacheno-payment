@@ -1,65 +1,93 @@
-
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Payments.Data;
 using Shared;
 using Payments.Models;
+using AspNetCoreRateLimit;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddDbContext<PaymentDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
 
+
 builder.Services.AddSingleton<IPaymentEventProducer, KafkaProducer>();  
 
 
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo("./keys"))
+    .SetApplicationName("Schvacheno");
+builder.Services.AddSingleton<ICardEncryption, DataProtectionCardEncryption>();
+
+
+builder.Services.Configure<IpRateLimitOptions>(builder.Configuration.GetSection("IpRateLimiting"));
+builder.Services.AddSingleton<IIpPolicyStore, MemoryCacheIpPolicyStore>();
+builder.Services.AddSingleton<IRateLimitCounterStore, MemoryCacheRateLimitCounterStore>();
+builder.Services.AddInMemoryRateLimiting();
+
+
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379";
+});
+
 var app = builder.Build();
 
-app.MapGet("/", () => "This is Payments Service");
 
+app.UseIpRateLimiting(); 
 
-app.MapPost("/pay/initiate", async (InitiatePaymentRequest req, PaymentDbContext db) =>
-{
-    var transaction = new Transaction
-    {
-        UserId = req.UserId,
-        Amount = req.Amount,
-        Currency = req.Currency,
-        CardLast4 = req.CardToken[^4..],  // Маскируем карту
-        Status = PaymentStatusEnum.Initiated
-    };
-    
-    db.Transactions.Add(transaction);     
-    await db.SaveChangesAsync();        
-
-    var producer = app.Services.GetRequiredService<IPaymentEventProducer>();
-    await producer.ProducePaymentRequestedAsync(transaction.Id, req);
-
-    return Results.Accepted("202"); // 202
-});
-
+app.MapGet("/", () => "Schvacheno Payments Service v.1.0.0");
 app.MapPost("/test-db", async (PaymentDbContext db) =>
-{
-    // Тест INSERT
-    var testTx = new Transaction 
-    { 
-        UserId = Guid.NewGuid(), 
-        Amount = 999.99m,
-        Currency = "RUB"
-    };
-    
-    db.Transactions.Add(testTx);
-    await db.SaveChangesAsync();
-    
-    // Тест SELECT
-    var count = await db.Transactions.CountAsync();
-    
-    return Results.Ok(new 
-    { 
-        message = "✅ DB Works!",
-        createdId = testTx.Id,
-        totalTransactions = count
+    {
+        // Тест INSERT
+        var testTx = new Transaction 
+        { 
+            UserId = Guid.NewGuid(), 
+            Amount = 999.99m,
+            Currency = "RUB"
+        };
+        
+        db.Transactions.Add(testTx);
+        await db.SaveChangesAsync();
+        
+        // Тест SELECT
+        var count = await db.Transactions.CountAsync();
+        
+        return Results.Ok(new 
+        { 
+            message = "✅ DB Works!",
+            createdId = testTx.Id,
+            totalTransactions = count
+        });
     });
-});
+
+app.MapPost("/pay/initiate", async (InitiatePaymentRequest req, 
+    PaymentDbContext db, 
+    PaymentSaga saga,
+    ICardEncryption encryption) =>
+    {
+        // 1. Шифруем карту
+        var encryptedCard = encryption.Encrypt(req.CardToken);
+        
+        // 2. Создаем транзакцию
+        var transaction = new Transaction
+        {
+            UserId = req.UserId,
+            Amount = req.Amount,
+            Currency = req.Currency,
+            CardLast4 = req.CardToken[^4..],
+            EncryptedCardData = encryptedCard
+        };
+
+        // 3. Saga orchestration
+        var result = await saga.ProcessAsync(transaction);
+        
+        if (result == PaymentStatusEnum.Failed)
+            return Results.Problem("Daily limit exceeded or concurrent payment");
+
+        return Results.Accepted($"/pay/status/{transaction.Id}", new { transactionId = transaction.Id });
+    }).DisableAntiforgery(); 
 
 
 app.MapGet("/pay/status/{id:guid}", async (Guid id, PaymentDbContext db) =>
