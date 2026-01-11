@@ -16,6 +16,6 @@ public class DataProtectionCardEncryption : ICardEncryption
         _protector = provider.CreateProtector("Schvacheno.v1.CardData");
     }
 
-    public string Encrypt(string cardToken) => _protector.Protect(Encoding.UTF8.GetBytes(cardToken)).ToString() ?? string.Empty;
+    public string Encrypt(string cardToken) => _protector.Protect(cardToken); 
     public string Decrypt(string encryptedToken) => _protector.Unprotect(encryptedToken);
 }

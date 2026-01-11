@@ -4,16 +4,20 @@ using Payments.Data;
 using Shared;
 using Payments.Models;
 using AspNetCoreRateLimit;
-using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddDbContext<PaymentDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
+builder.Services.AddMemoryCache();
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379";
+});
 
-
-builder.Services.AddSingleton<IPaymentEventProducer, KafkaProducer>();  
-
+builder.Services.Configure<IpRateLimitOptions>(builder.Configuration.GetSection("IpRateLimiting"));
+builder.Services.AddSingleton<IIpPolicyStore, MemoryCacheIpPolicyStore>();
+builder.Services.AddSingleton<IRateLimitCounterStore, MemoryCacheRateLimitCounterStore>();
+builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
+builder.Services.AddInMemoryRateLimiting();
 
 builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo("./keys"))
@@ -21,19 +25,19 @@ builder.Services.AddDataProtection()
 builder.Services.AddSingleton<ICardEncryption, DataProtectionCardEncryption>();
 
 
-builder.Services.Configure<IpRateLimitOptions>(builder.Configuration.GetSection("IpRateLimiting"));
-builder.Services.AddSingleton<IIpPolicyStore, MemoryCacheIpPolicyStore>();
-builder.Services.AddSingleton<IRateLimitCounterStore, MemoryCacheRateLimitCounterStore>();
-builder.Services.AddInMemoryRateLimiting();
+builder.Services.AddHttpClient();
+builder.Services.AddDbContext<PaymentDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
 
 
-builder.Services.AddStackExchangeRedisCache(options =>
-{
-    options.Configuration = builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379";
-});
+builder.Services.AddSingleton<IPaymentEventProducer, KafkaProducer>();  
+
+
+builder.Services.AddScoped<PaymentSaga>();
+builder.Services.AddScoped<CurrencyService>();
+
 
 var app = builder.Build();
-
 
 app.UseIpRateLimiting(); 
 
@@ -67,10 +71,8 @@ app.MapPost("/pay/initiate", async (InitiatePaymentRequest req,
     PaymentSaga saga,
     ICardEncryption encryption) =>
     {
-        // 1. Шифруем карту
         var encryptedCard = encryption.Encrypt(req.CardToken);
         
-        // 2. Создаем транзакцию
         var transaction = new Transaction
         {
             UserId = req.UserId,
@@ -80,7 +82,6 @@ app.MapPost("/pay/initiate", async (InitiatePaymentRequest req,
             EncryptedCardData = encryptedCard
         };
 
-        // 3. Saga orchestration
         var result = await saga.ProcessAsync(transaction);
         
         if (result == PaymentStatusEnum.Failed)

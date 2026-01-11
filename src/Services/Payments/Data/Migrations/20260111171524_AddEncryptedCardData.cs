@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Payments.Data.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class AddEncryptedCardData : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -21,7 +21,8 @@ namespace Payments.Data.Migrations
                     Currency = table.Column<string>(type: "character varying(3)", maxLength: 3, nullable: false),
                     Status = table.Column<int>(type: "integer", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    CardLast4 = table.Column<string>(type: "text", nullable: false)
+                    CardLast4 = table.Column<string>(type: "text", nullable: false),
+                    EncryptedCardData = table.Column<string>(type: "text", nullable: false)
                 },
                 constraints: table =>
                 {

@@ -32,7 +32,7 @@ public class PaymentSaga
                 return PaymentStatusEnum.Failed;
 
             transaction.Status = PaymentStatusEnum.Processing;
-            _db.Update(transaction);
+            _db.Add(transaction);
             await _db.SaveChangesAsync();
 
 
