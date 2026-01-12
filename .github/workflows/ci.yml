@@ -1,0 +1,27 @@
+name: CI/CD
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup .NET 9
+      uses: actions/setup-dotnet@v4
+      with: { dotnet-version: 9.0.x }
+    
+    - name: Restore
+      run: dotnet restore
+    
+    - name: Test + Coverage
+      run: |
+        dotnet test tests/Payments.Tests --collect:"XPlat Code Coverage" --logger trx
+        reportgenerator -reports:"**/coverage.cobertura.xml" -targetdir:"coveragereport" -reporttypes:Html
+        bash <(curl -s https://codecov.io/bash)
+    
+    - name: Upload coverage
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: coveragereport/

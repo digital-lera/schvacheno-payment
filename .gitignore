@@ -53,3 +53,7 @@ CodeCoverage/
 TestResult.xml
 nunit-*.xml
 src/Services/Payments/keys/
+
+#Tests
+coveragereport/ 
+.DS_Store 

@@ -1,0 +1,130 @@
+{
+  "info": {
+    "name": "Schvacheno Payments API Tests",
+    "_postman_id": "schvacheno-tests",
+    "description": "Production-grade tests for payments microservice",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "💳 Initiate Payment (200 OK)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"amount\": 100,\n  \"currency\": \"RUB\",\n  \"cardToken\": \"tok_visa\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/pay/initiate",
+          "host": ["{{baseUrl}}"],
+          "path": ["pay", "initiate"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "🙌 Get Payment Status",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/pay/status/{{transactionId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["pay", "status", "{{transactionId}}"]
+        }
+      }
+    },
+    {
+      "name": "💵 Get Currency Rate",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/rates/USD/RUB",
+          "host": ["{{baseUrl}}"],
+          "path": ["rates", "USD", "RUB"]
+        }
+      }
+    },
+    {
+      "name": "💸 Rate Limit Test (429)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"amount\": 100,\n  \"currency\": \"RUB\",\n  \"cardToken\": \"tok_visa\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/pay/initiate",
+          "host": ["{{baseUrl}}"],
+          "path": ["pay", "initiate"]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5143"
+    },
+    {
+      "key": "transactionId",
+      "value": ""
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "exec": [
+          ""
+        ],
+        "type": "text/javascript"
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "exec": [
+          "pm.test(\"Status code is 202\", function () {",
+          "    pm.response.to.have.status(202);",
+          "});",
+          "",
+          "pm.test(\"Response time is less than 500ms\", function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(500);",
+          "});",
+          "",
+          "// Сохранить transactionId для следующего теста",
+          "if (pm.response.code === 202) {",
+          "    var jsonData = pm.response.json();",
+          "    pm.collectionVariables.set(\"transactionId\", jsonData.transactionId);",
+          "}"
+        ],
+        "type": "text/javascript"
+      }
+    }
+  ]
+}
+
